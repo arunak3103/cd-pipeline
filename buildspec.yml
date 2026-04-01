@@ -22,15 +22,14 @@ phases:
   build:
     commands:
       - echo Building Docker image...
-      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
-      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG 955030484275.dkr.ecr.us-east-1.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
-
+      - docker build -t static-app .
+      - docker tag static-app:latest 955030484275.dkr.ecr.us-east-1.amazonaws.com/static-app:latest
   post_build:
     commands:
       - echo Pushing to ECR...
-      - docker push 955030484275.dkr.ecr.us-east-1.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - docker push 955030484275.dkr.ecr.us-east-1.amazonaws.com/static-app:latest
 
       - echo Deploying to EKS...
-      - aws eks update-kubeconfig --region us-east-1 --name my-cluster
+      - aws eks update-kubeconfig --region us-east-1 --name test-cluster
       - kubectl apply -f deployment.yaml
       - kubectl apply -f service.yaml
