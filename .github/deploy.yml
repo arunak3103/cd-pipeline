@@ -1,0 +1,64 @@
+name: Build and Push to ECR (OIDC)
+
+on:
+push:
+branches:
+- main
+
+permissions:
+id-token: write
+contents: write
+
+env:
+AWS_REGION: us-east-1
+ECR_REPOSITORY: static-app
+ACCOUNT_ID: 955030484275
+
+jobs:
+build-and-push:
+runs-on: ubuntu-latest
+
+```
+steps:
+- name: Checkout code
+  uses: actions/checkout@v3
+
+- name: Configure AWS credentials (OIDC)
+  uses: aws-actions/configure-aws-credentials@v2
+  with:
+    role-to-assume: arn:aws:iam::955030484275:role/oidc-policy
+    aws-region: ${{ env.AWS_REGION }}
+
+- name: Login to Amazon ECR
+  run: |
+    aws ecr get-login-password --region $AWS_REGION \
+    | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+- name: Set image tag
+  run: echo "IMAGE_TAG=v${{ github.run_number }}" >> $GITHUB_ENV
+
+- name: Build Docker image
+  run: |
+    docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+
+- name: Tag Docker image
+  run: |
+    docker tag $ECR_REPOSITORY:$IMAGE_TAG \
+    $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+
+- name: Push Docker image
+  run: |
+    docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+
+- name: Update Kubernetes deployment file
+  run: |
+    sed -i "s|image:.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG|g" deployment.yml
+
+- name: Commit and push changes
+  run: |
+    git config --global user.name "github-actions"
+    git config --global user.email "actions@github.com"
+    git add deployment.yml
+    git commit -m "Update image to $IMAGE_TAG" || echo "No changes to commit"
+    git push
+```
